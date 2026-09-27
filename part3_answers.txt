@@ -1,0 +1,62 @@
+
+## 1. The classifier is wrong about 30% of the time. What do you do, and how would you decide whether it is good enough?
+
+First, I would not decide only from overall accuracy.
+
+I would evaluate the model on a representative validation dataset and look at metrics such as accuracy, precision, recall, and a confusion matrix for each class.
+
+I would check which classes are being confused with each other. For example, if two visually similar land-use classes are frequently confused, I would investigate whether the training data contains enough representative examples of both classes.
+
+I would also check whether the evaluation dataset represents the images that the system will receive in actual use.
+
+If the model is not good enough, I would investigate the dataset, improve preprocessing or feature extraction, try alternative models, and tune the model using validation data.
+
+Whether 70% accuracy is good enough depends on the intended use. If predictions are only used to assist an analyst, it may be useful with low-confidence predictions sent for review. If incorrect predictions have serious consequences, a higher level of reliability would be required.
+
+I would therefore define "good enough" based on the actual use case and the cost of incorrect predictions.
+
+## 2. The service runs offline with no one watching it live. A month after deployment, how would you know it is still working correctly?
+
+I would add local health checks and structured logs.
+
+The service should record information such as:
+
+* Request count
+* Successful predictions
+* Failed requests
+* Prediction timestamps
+* Model version
+* Processing errors
+
+I would also periodically run a small set of known test images through the service. Since their expected predictions are known, the results can be compared with the expected outputs.
+
+I would monitor whether the database is still receiving new prediction records and whether the application is producing errors.
+
+For an offline deployment, these logs and health-check results could be stored locally and inspected periodically or exported when the machine is connected to the appropriate maintenance system.
+
+## 3. Tiles are coming in fine, but the stored results look wrong. What are your debugging steps?
+
+I would debug the pipeline in order instead of immediately changing the model.
+
+1. Verify that the uploaded image is the same image that the API received.
+2. Check the image preprocessing and confirm that the image is converted to the expected format.
+3. Check that the same HOG configuration is used during training and prediction.
+4. Run the same image directly through the model outside the API and compare the prediction.
+5. Check the confidence value returned by the model.
+6. Compare the API prediction with the direct model prediction.
+7. If the model prediction is correct but the database record is wrong, inspect the database INSERT logic.
+8. Verify that the filename, prediction, confidence, and timestamp are mapped to the correct database columns.
+9. Check whether multiple requests are writing to the same records unexpectedly.
+10. Add logging around the prediction and database-storage steps to identify where the value changes.
+
+This allows me to isolate whether the problem is in image processing, model inference, API handling, or database storage.
+
+## 4. What is the weakest part of your design, and what would break it first?
+
+The weakest part is the classifier and its dependence on the training data.
+
+The current implementation uses a relatively simple HOG + SVM approach and was trained on the provided dataset. If real-world satellite images differ significantly from the training data, model performance could decrease.
+
+Another limitation is the current SQLite storage. It is appropriate for this small offline working slice, but a much larger number of concurrent requests or a larger operational workload would require a more robust storage design.
+
+The first thing I would improve for a production system would be model evaluation and robustness against changes in the input data, followed by stronger monitoring, model versioning, and storage/query capabilities.
